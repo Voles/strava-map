@@ -1,0 +1,23 @@
+{
+  "name": "eurovelo8-route",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "compression": "1.7.2",
+    "geojson-extent": "0.3.2",
+    "mapbox-gl": "0.45.0",
+    "memory-cache": "0.2.0",
+    "normalize.css": "8.0.0",
+    "strava-v3": "1.14.0"
+  },
+  "devDependencies": {
+    "express": "4.16.3"
+  }
+}

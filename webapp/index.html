@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>EuroVelo8 - Strava</title>
+
+  <link href="https://api.mapbox.com/mapbox-gl-js/v0.44.2/mapbox-gl.css" rel="stylesheet" />
+  <link href="../node_modules/normalize.css/normalize.css" rel="stylesheet" />
+  <link href="app.css" rel="stylesheet" />
+
+  <script src="../node_modules/geojson-extent/geojson-extent.js"></script>
+  <script src="../node_modules/mapbox-gl/dist/mapbox-gl.js"></script>
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <div id="statistics" class="is-hidden">
+    <div class="statistics-inner">
+      <h1>EuroVelo 8 🚲</h1>
+
+      <p>
+        <span id="distance"></span> km afgelegd in <span id="duration"></span>
+      </p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
