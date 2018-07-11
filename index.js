@@ -1,60 +1,20 @@
+'use strict';
+
 const express = require('express');
 const compression = require('compression');
 const cache = require('memory-cache');
 const geojsonExtent = require('geojson-extent');
-const strava = require('strava-v3');
 const app = express();
+
+const getActivities = require('./strava').getActivities;
+const getActivityLatLngStream = require('./strava').getActivityLatLngStream;
+const getSumForListObjectsProperties = require('./utils').getSumForListObjectsProperties;
+const convertStravaLatLngStreamToGeoJSONLineString = require('./geojson').convertStravaLatLngStreamToGeoJSONLineString;
 
 app.use(compression());
 app.use(express.static('.'));
 
-const getActivities = options => {
-	return new Promise((resolve, reject) => {
-		strava
-			.athlete
-			.listActivities(options , (err, payload) => {
-				if (err) {
-					reject(err);
-				} else {
-					resolve(payload);
-				}
-			});
-	});
-};
-
-function convert(stream) {
-  if (!stream || !stream.filter) return;
-  return stream.filter(function(e) {
-    return e.type === 'latlng';
-  }).map(function(e) {
-    return {
-      type: 'Feature',
-      geometry: {
-        type: 'LineString',
-        coordinates: e.data.map(function(coord) {
-          return coord.slice().reverse();
-        })
-      },
-      properties: {}
-    };
-  })[0];
-}
-
-const getActivityStream = activityId => {
-  return new Promise((resolve, reject) => {
-    strava
-      .streams
-      .activity({ id: activityId, types: 'latlng', resolution: 'low' }, (err, payload) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(payload);
-        }
-      });
-  });
-};
-
-function doIt(options, page, activities) {
+function getAllActivitiesForUser(options, page, activities) {
   activities = activities || [];
   page = page || 1;
 
@@ -63,7 +23,7 @@ function doIt(options, page, activities) {
       .then(payload => {
         const newActivities = activities.concat(payload);
         if (payload.length >= options.per_page) {
-          return doIt(options, page + 1, newActivities);
+          return getAllActivitiesForUser(options, page + 1, newActivities);
         } else {
           return newActivities;
         }
@@ -82,9 +42,11 @@ const cacheGetActivities = () =>
     if (cache.get('activities')) {
       resolve(cache.get('activities'));
     } else {
-      const FIRST_OF_JANUARY_2018 = 1514764800;
-      const JULY_15TH_2018 = 1531612800;
-      return doIt({ after: JULY_15TH_2018, per_page: 25 })
+      // const FIRST_OF_JANUARY_2018 = 1514764800;
+      // const JULY_15TH_2018 = 1531612800;
+      const JULY_8TH = 1531008000;
+      const JULY_11TH_AFTER_NOON = 1531310416;
+      return getAllActivitiesForUser({ after: JULY_11TH_AFTER_NOON, per_page: 25 })
         .then(activities => {
           cache.put('activities', activities, 1000 * 60 * 60 * 2); // 2u
           resolve(activities);
@@ -100,7 +62,7 @@ const cacheGetActivityRouteStream = activityId =>
     if (cache.get(`activity_${activityId}`)) {
       resolve(cache.get(`activity_${activityId}`));
     } else {
-      getActivityStream(activityId)
+      getActivityLatLngStream(activityId)
         .then(res => {
           cache.put(`activity_${activityId}`, res);
           resolve(res);
@@ -112,16 +74,11 @@ const cacheGetActivityRouteStream = activityId =>
   });
 
 app.get('/strava', (req, res) => {
-  let duration = 0;
-  let distance = 0;
+  let stats;
 
   cacheGetActivities()
     .then(activities => {
-      duration = activities.reduce((acc, currentValue) => acc + currentValue.moving_time, 0);
-      distance = activities.reduce((acc, currentValue) => acc + currentValue.distance, 0);
-
-      console.log(activities
-        .filter(activity => !!activity).length);
+      stats = getSumForListObjectsProperties(activities, ['moving_time', 'distance']);
 
       return Promise
         .all(
@@ -129,7 +86,7 @@ app.get('/strava', (req, res) => {
             .filter(activity => !!activity)
             .map(activity =>
               cacheGetActivityRouteStream(activity.id)
-                .then(res => convert(res))
+                .then(latLngStream => convertStravaLatLngStreamToGeoJSONLineString(latLngStream))
             )
         )
     })
@@ -147,8 +104,8 @@ app.get('/strava', (req, res) => {
           geojson,
           bounds,
           statistics: {
-            duration,
-            distance
+            duration: stats.moving_time,
+            distance: stats.distance
           }
         });
     })
@@ -157,4 +114,4 @@ app.get('/strava', (req, res) => {
      });
 });
 
-app.listen(3000, () => console.log('Example app listening on port 3000!'))
+app.listen(3000, () => console.log('App running and listening on port 3000'));
