@@ -35,6 +35,8 @@ const getActivityLatLngStream = activityId => {
           reject(err);
         } else {
 
+          streams = streams.filter ? streams : [];
+
           // NOTE: we actually get a list of 2 streams back from Strava
           // one with the latlng and the second one with the distance
           // we will only resolve the latlng stream to prevent saving a lot of data (the dataset of streams can get big if you have many activities)

@@ -4,6 +4,8 @@ const express = require('express');
 const compression = require('compression');
 const cache = require('memory-cache');
 const geojsonExtent = require('geojson-extent');
+const schedule = require('node-schedule');
+const debug = require('debug')('strava-map');
 const app = express();
 
 const getActivities = require('./strava').getActivities;
@@ -13,6 +15,59 @@ const convertStravaLatLngStreamToGeoJSONLineString = require('./geojson').conver
 
 app.use(compression());
 app.use(express.static('.'));
+
+cache.put('activitiesFetchedAfter', null);
+
+// every 15 mins, from 6:00 - 23:00
+// via https://stackoverflow.com/a/41743794
+const job = schedule
+  .scheduleJob('*/15 6-23 * * *', function (fireDate) {
+    debug(`This job was supposed to run at ${fireDate}, but actually ran at ${new Date()}`);
+
+    const FIRST_OF_JANUARY_2018 = 1514764800;
+    const JULY_15TH_2018 = 1531612800;
+    const JULY_8TH = 1531008000;
+    const JULY_11TH_AFTER_NOON = 1531310416;
+
+    const after = !cache.get('activitiesFetchedAfter') ?
+      JULY_8TH :
+      cache.get('activitiesFetchedAfter');
+
+    const currentUnixDateTimeInSeconds = Math.floor(Date.now() / 1000);
+    cache.put('activitiesFetchedAfter', currentUnixDateTimeInSeconds);
+
+    debug(`Get all activities for user, after ${after}`);
+
+    getAllActivitiesForUser({ after: after, per_page: 25 })
+      .then(activities => {
+        debug(`Got ${activities.length} ${activities.length === 1 ? 'activity' : 'activities'}`);
+
+        // only save a subset of properties from the activity, to prevent memory issues
+        const activitiesSubset = activities
+          .map(activity => Object.assign({}, {
+            id: activity.id,
+            distance: activity.distance,
+            moving_time: activity.moving_time,
+          }));
+
+        cache.put('activities', activitiesSubset);
+        return activitiesSubset;
+      })
+      .then(activities => {
+        return Promise
+          .all(
+            activities
+              .filter(activity => !!activity)
+              .map(activity => cacheGetActivityRouteStream(activity.id))
+          )
+      })
+      .then(() => {
+        debug('Finished getting all new activities & activity latlng streams');
+      })
+      .catch(err => {
+        console.error(err);
+      });
+  });
 
 function getAllActivitiesForUser(options, page, activities) {
   activities = activities || [];
@@ -38,22 +93,11 @@ function getAllActivitiesForUser(options, page, activities) {
 }
 
 const cacheGetActivities = () =>
-  new Promise((resolve, reject) => {
+  new Promise(resolve => {
     if (cache.get('activities')) {
       resolve(cache.get('activities'));
     } else {
-      // const FIRST_OF_JANUARY_2018 = 1514764800;
-      // const JULY_15TH_2018 = 1531612800;
-      const JULY_8TH = 1531008000;
-      const JULY_11TH_AFTER_NOON = 1531310416;
-      return getAllActivitiesForUser({ after: JULY_11TH_AFTER_NOON, per_page: 25 })
-        .then(activities => {
-          cache.put('activities', activities, 1000 * 60 * 60 * 2); // 2u
-          resolve(activities);
-        })
-        .catch(err => {
-          reject(err);
-        });
+      resolve([]);
     }
   });
 
@@ -114,4 +158,4 @@ app.get('/strava', (req, res) => {
      });
 });
 
-app.listen(3000, () => console.log('App running and listening on port 3000'));
+app.listen(3000, () => debug('App running and listening on port 3000'));
