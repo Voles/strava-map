@@ -24,13 +24,10 @@ const job = schedule
   .scheduleJob('*/15 6-23 * * *', function (fireDate) {
     debug(`This job was supposed to run at ${fireDate}, but actually ran at ${new Date()}`);
 
-    const FIRST_OF_JANUARY_2018 = 1514764800;
-    const JULY_15TH_2018 = 1531612800;
-    const JULY_8TH = 1531008000;
-    const JULY_11TH_AFTER_NOON = 1531310416;
+    const JULY_14TH = 1531526400;
 
     const after = !cache.get('activitiesFetchedAfter') ?
-      JULY_8TH :
+      JULY_14TH :
       cache.get('activitiesFetchedAfter');
 
     const currentUnixDateTimeInSeconds = Math.floor(Date.now() / 1000);
