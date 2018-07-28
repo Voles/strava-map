@@ -21,7 +21,7 @@ cache.put('activitiesFetchedAfter', null);
 // every 15 mins, from 6:00 - 23:00
 // via https://stackoverflow.com/a/41743794
 const job = schedule
-  .scheduleJob('*/15 6-23 * * *', function (fireDate) {
+  .scheduleJob('*/2 6-23 * * *', function (fireDate) {
     debug(`This job was supposed to run at ${fireDate}, but actually ran at ${new Date()}`);
 
     const JULY_14TH = 1531526400;
